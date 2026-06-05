@@ -127,20 +127,20 @@ function stripPcs(value) {
 }
 
 async function loadSiteConfig() {
-  const savedSite = loadSavedSiteConfig()
-  if (savedSite) return savedSite
-
   try {
     const response = await fetch('/data/site.json')
     if (response.ok) return { ...DEFAULT_SITE, ...(await response.json()) }
   } catch {
-    return DEFAULT_SITE
+    const savedSite = loadSavedSiteConfig()
+    if (savedSite) return savedSite
   }
 
   return DEFAULT_SITE
 }
 
 function loadSavedSiteConfig() {
+  if (!isLocalPreviewHost()) return null
+
   try {
     return { ...DEFAULT_SITE, ...JSON.parse(localStorage.getItem('siteConfig') ?? '{}') }
   } catch {
@@ -149,6 +149,8 @@ function loadSavedSiteConfig() {
 }
 
 function loadSavedProducts() {
+  if (!isLocalPreviewHost()) return []
+
   try {
     const raw = localStorage.getItem('skuProducts') ?? '[]'
     if (raw.length > 500000 || raw.includes('data:image/')) {
@@ -161,6 +163,10 @@ function loadSavedProducts() {
   } catch {
     return []
   }
+}
+
+function isLocalPreviewHost() {
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
 }
 
 function applyFavicon(href) {
