@@ -1,5 +1,22 @@
 import './style.css'
 
+const DEFAULT_TRUST_STATS = [
+  { value: '4,860+', unit: 'sqm', label: 'Factory Area' },
+  { value: '3+', unit: 'lines', label: 'Production Lines' },
+  { value: '5,000+', unit: 'pcs/day', label: 'Custom Daily Capacity' },
+  { value: '80+', unit: 'people', label: 'Employees' },
+]
+
+const DEFAULT_CERTIFICATES = [
+  { label: 'ICTI CARE', image: '' },
+  { label: 'BSCI', image: '' },
+  { label: 'ISO 9001', image: '' },
+  { label: 'CE-RED', image: '' },
+  { label: 'CCC', image: '' },
+  { label: 'RoHS', image: '' },
+  { label: 'EN71', image: '' },
+]
+
 const DEFAULT_SITE = {
   brand: 'LuLu Funny Tech Toys',
   subtitle: 'OEM & ODM supported worldwide.',
@@ -10,6 +27,8 @@ const DEFAULT_SITE = {
   logoImage: '',
   coverImage:
     'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1600&q=82',
+  trustStats: DEFAULT_TRUST_STATS,
+  certificates: DEFAULT_CERTIFICATES,
 }
 
 const app = document.querySelector('#app')
@@ -39,6 +58,8 @@ function render() {
   app.innerHTML = `
     <main class="page-shell">
       ${renderCompanyHeader()}
+      ${renderFactorySection()}
+      ${renderCertificateSection()}
       ${renderCatalog()}
       ${renderFooter()}
     </main>
@@ -63,6 +84,53 @@ function renderCompanyHeader() {
           <a class="primary-button" href="${whatsAppUrl('Hello, I would like to ask about your SKU catalog.')}">WhatsApp</a>
           <a class="secondary-button" href="mailto:${site.email}">Email</a>
         </div>
+      </div>
+    </section>
+  `
+}
+
+function renderFactorySection() {
+  return `
+    <section class="factory-section">
+      <div class="section-heading">
+        <span>Factory at a Glance</span>
+        <h2>Production scale for OEM and wholesale orders.</h2>
+      </div>
+      <div class="factory-grid">
+        ${site.trustStats.map(
+          (item) => `
+            <div class="factory-stat">
+              <strong>
+                <span class="factory-stat-value">${item.value}</span>
+                <span class="factory-stat-unit">${item.unit}</span>
+              </strong>
+              <span>${item.label}</span>
+            </div>
+          `,
+        ).join('')}
+      </div>
+    </section>
+  `
+}
+
+function renderCertificateSection() {
+  return `
+    <section class="certificate-section">
+      <div class="section-heading">
+        <span>Compliance & Certifications</span>
+        <h2>Certificate logos can be placed here for quick buyer verification.</h2>
+      </div>
+      <div class="certificate-grid" aria-label="Certification logo placeholders">
+        ${site.certificates.map(
+        (certificate) => `
+            <div class="certificate-slot">
+              <div class="certificate-logo-space">
+                ${certificate.image ? `<img src="${certificate.image}" alt="${certificate.label} certificate" />` : ''}
+              </div>
+              <span>${certificate.label}</span>
+            </div>
+        `,
+      ).join('')}
       </div>
     </section>
   `
@@ -127,25 +195,42 @@ function stripPcs(value) {
 }
 
 async function loadSiteConfig() {
+  const savedSite = loadSavedSiteConfig()
+  if (savedSite) return savedSite
+
   try {
     const response = await fetch('/data/site.json')
-    if (response.ok) return { ...DEFAULT_SITE, ...(await response.json()) }
+    if (response.ok) return normalizeSiteConfig(await response.json())
   } catch {
-    const savedSite = loadSavedSiteConfig()
-    if (savedSite) return savedSite
+    return normalizeSiteConfig(DEFAULT_SITE)
   }
 
-  return DEFAULT_SITE
+  return normalizeSiteConfig(DEFAULT_SITE)
 }
 
 function loadSavedSiteConfig() {
   if (!isLocalPreviewHost()) return null
 
   try {
-    return { ...DEFAULT_SITE, ...JSON.parse(localStorage.getItem('siteConfig') ?? '{}') }
+    const raw = localStorage.getItem('siteConfig')
+    return raw ? normalizeSiteConfig(JSON.parse(raw)) : null
   } catch {
     return null
   }
+}
+
+function normalizeSiteConfig(config) {
+  const next = { ...DEFAULT_SITE, ...config }
+  return {
+    ...next,
+    trustStats: normalizeList(next.trustStats, DEFAULT_TRUST_STATS),
+    certificates: normalizeList(next.certificates, DEFAULT_CERTIFICATES),
+  }
+}
+
+function normalizeList(items, fallback) {
+  const source = Array.isArray(items) ? items : []
+  return fallback.map((fallbackItem, index) => ({ ...fallbackItem, ...(source[index] ?? {}) }))
 }
 
 function loadSavedProducts() {

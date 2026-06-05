@@ -1,5 +1,22 @@
 import './admin.css'
 
+const DEFAULT_TRUST_STATS = [
+  { value: '4,860+', unit: 'sqm', label: 'Factory Area' },
+  { value: '3+', unit: 'lines', label: 'Production Lines' },
+  { value: '5,000+', unit: 'pcs/day', label: 'Custom Daily Capacity' },
+  { value: '80+', unit: 'people', label: 'Employees' },
+]
+
+const DEFAULT_CERTIFICATES = [
+  { label: 'ICTI CARE', image: '' },
+  { label: 'BSCI', image: '' },
+  { label: 'ISO 9001', image: '' },
+  { label: 'CE-RED', image: '' },
+  { label: 'CCC', image: '' },
+  { label: 'RoHS', image: '' },
+  { label: 'EN71', image: '' },
+]
+
 const DEFAULT_SITE = {
   brand: 'LuLu Funny Tech Toys',
   subtitle: 'OEM & ODM supported worldwide.',
@@ -10,6 +27,8 @@ const DEFAULT_SITE = {
   logoImage: '',
   coverImage:
     'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1600&q=82',
+  trustStats: DEFAULT_TRUST_STATS,
+  certificates: DEFAULT_CERTIFICATES,
 }
 
 const PRODUCT_FIELDS = [
@@ -124,6 +143,9 @@ function render() {
           </div>
         </section>
 
+        ${renderFactoryEditor()}
+        ${renderCertificateEditor()}
+
         <section class="panel editor-panel">
           <div class="section-bar">
             <div>
@@ -178,6 +200,72 @@ function renderInput(name, label, value, scope, wide = false) {
   `
 }
 
+function renderFactoryEditor() {
+  return `
+    <section class="panel">
+      <div class="section-bar">
+        <div>
+          <p class="panel-kicker">Frontend Trust Section</p>
+          <h2>Factory Data</h2>
+        </div>
+      </div>
+      <div class="trust-editor-grid">
+        ${site.trustStats.map(
+          (item, index) => `
+            <div class="trust-editor-row">
+              <label>
+                <span>Number</span>
+                <input data-scope="trustStats" data-index="${index}" data-field="value" value="${escapeHtml(item.value)}" />
+              </label>
+              <label>
+                <span>Unit</span>
+                <input data-scope="trustStats" data-index="${index}" data-field="unit" value="${escapeHtml(item.unit)}" />
+              </label>
+              <label class="wide-field">
+                <span>Label</span>
+                <input data-scope="trustStats" data-index="${index}" data-field="label" value="${escapeHtml(item.label)}" />
+              </label>
+            </div>
+          `,
+        ).join('')}
+      </div>
+    </section>
+  `
+}
+
+function renderCertificateEditor() {
+  return `
+    <section class="panel">
+      <div class="section-bar">
+        <div>
+          <p class="panel-kicker">Frontend Trust Section</p>
+          <h2>Certifications</h2>
+        </div>
+      </div>
+      <div class="certificate-editor-grid">
+        ${site.certificates.map(
+          (certificate, index) => `
+            <div class="certificate-editor-row">
+              <button class="certificate-picker" type="button" data-cert-upload="${index}">
+                ${certificate.image ? `<img src="${escapeHtml(certificate.image)}" alt="${escapeHtml(certificate.label)} preview" />` : '<span>Choose</span>'}
+              </button>
+              <input hidden type="file" accept="image/*" data-cert-file-input="${index}" />
+              <label>
+                <span>Label</span>
+                <input data-scope="certificates" data-index="${index}" data-field="label" value="${escapeHtml(certificate.label)}" />
+              </label>
+              <label>
+                <span>Image URL / Path</span>
+                <input data-scope="certificates" data-index="${index}" data-field="image" value="${escapeHtml(certificate.image)}" />
+              </label>
+            </div>
+          `,
+        ).join('')}
+      </div>
+    </section>
+  `
+}
+
 function bindEvents() {
   admin.querySelectorAll('[data-scope]').forEach((input) => {
     input.addEventListener('input', handleFieldInput)
@@ -214,6 +302,16 @@ function bindEvents() {
     input.addEventListener('change', handleSiteImageFile)
   })
 
+  admin.querySelectorAll('[data-cert-upload]').forEach((button) => {
+    button.addEventListener('click', () => {
+      admin.querySelector(`[data-cert-file-input="${button.dataset.certUpload}"]`)?.click()
+    })
+  })
+
+  admin.querySelectorAll('[data-cert-file-input]').forEach((input) => {
+    input.addEventListener('change', handleCertificateImageFile)
+  })
+
   admin.querySelector('[data-product-upload]')?.addEventListener('click', () => {
     admin.querySelector('[data-product-file-input]')?.click()
   })
@@ -225,8 +323,23 @@ function handleFieldInput(event) {
   const { scope, field } = event.target.dataset
   if (scope === 'site') {
     site = { ...site, [field]: event.target.value }
+  } else if (scope === 'trustStats') {
+    updateSiteListItem('trustStats', Number(event.target.dataset.index), field, event.target.value)
+  } else if (scope === 'certificates') {
+    updateSiteListItem('certificates', Number(event.target.dataset.index), field, event.target.value)
   } else {
     products[selectedIndex] = { ...products[selectedIndex], [field]: event.target.value }
+  }
+}
+
+function updateSiteListItem(listName, index, field, value) {
+  if (!Number.isInteger(index) || !Array.isArray(site[listName]) || !site[listName][index]) return
+
+  site = {
+    ...site,
+    [listName]: site[listName].map((item, itemIndex) =>
+      itemIndex === index ? { ...item, [field]: value } : item,
+    ),
   }
 }
 
@@ -270,6 +383,26 @@ async function handleSiteImageFile(event) {
   try {
     const image = await resizeImageFile(file, field === 'coverImage')
     site = { ...site, [field]: image }
+    render()
+  } catch (error) {
+    alert(`Image failed: ${error.message}`)
+  } finally {
+    event.target.value = ''
+  }
+}
+
+async function handleCertificateImageFile(event) {
+  const file = event.target.files?.[0]
+  const index = Number(event.target.dataset.certFileInput)
+  if (!file || !Number.isInteger(index)) return
+
+  try {
+    const image = await resizeImageFile(file, {
+      maxWidth: 520,
+      maxHeight: 520,
+      quality: 0.86,
+    })
+    updateSiteListItem('certificates', index, 'image', image)
     render()
   } catch (error) {
     alert(`Image failed: ${error.message}`)
@@ -335,19 +468,27 @@ async function exportCsv() {
   if (saved) return
 
   const { exportProducts, imageExports } = prepareProductsForExport(products)
+  const { exportSite, siteImageExports } = prepareSiteForExport(site)
   const csv = toCsv(exportProducts)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   downloadBlob(blob, 'products.csv')
+  downloadBlob(new Blob([JSON.stringify(exportSite, null, 2)], { type: 'application/json;charset=utf-8' }), 'site.json')
 
   imageExports.forEach((imageExport) => {
     downloadBlob(dataUrlToBlob(imageExport.dataUrl), imageExport.filename)
   })
 
+  siteImageExports.forEach((imageExport) => {
+    downloadBlob(dataUrlToBlob(imageExport.dataUrl), imageExport.filename)
+  })
+
   products = exportProducts
+  site = exportSite
   render()
 
-  if (imageExports.length > 0) {
-    alert(`Exported CSV and ${imageExports.length} image file(s). Put the downloaded image file(s) into public/products.`)
+  const totalImages = imageExports.length + siteImageExports.length
+  if (totalImages > 0) {
+    alert(`Exported products.csv, site.json, and ${totalImages} image file(s). Use the local update script or put the files into the matching project folders.`)
   }
 }
 
@@ -384,6 +525,35 @@ function prepareProductsForExport(items) {
   })
 
   return { exportProducts, imageExports }
+}
+
+function prepareSiteForExport(source) {
+  const siteImageExports = []
+  const exportSite = normalizeSiteConfig(source)
+  const siteImages = [
+    { field: 'coverImage', filename: 'cover.jpg', path: '/site/cover.jpg' },
+    { field: 'logoImage', filename: 'logo.jpg', path: '/site/logo.jpg' },
+  ]
+
+  siteImages.forEach((image) => {
+    const value = String(exportSite[image.field] || '')
+    if (!value.startsWith('data:image/')) return
+
+    siteImageExports.push({ filename: image.filename, dataUrl: value })
+    exportSite[image.field] = image.path
+  })
+
+  const usedNames = new Set()
+  exportSite.certificates = exportSite.certificates.map((certificate, index) => {
+    const image = String(certificate.image || '')
+    if (!image.startsWith('data:image/')) return certificate
+
+    const filename = uniqueFilename(`${slug(certificate.label || `certificate-${index + 1}`)}.jpg`, usedNames)
+    siteImageExports.push({ filename, dataUrl: image })
+    return { ...certificate, image: `/site/certificates/${filename}` }
+  })
+
+  return { exportSite, siteImageExports }
 }
 
 function productImageName(product, index) {
@@ -450,20 +620,35 @@ async function loadSiteConfig() {
 
   try {
     const response = await fetch('/data/site.json')
-    if (response.ok) return { ...DEFAULT_SITE, ...(await response.json()) }
+    if (response.ok) return normalizeSiteConfig(await response.json())
   } catch {
-    return DEFAULT_SITE
+    return normalizeSiteConfig(DEFAULT_SITE)
   }
 
-  return DEFAULT_SITE
+  return normalizeSiteConfig(DEFAULT_SITE)
 }
 
 function loadSavedSiteConfig() {
   try {
-    return { ...DEFAULT_SITE, ...JSON.parse(localStorage.getItem('siteConfig') ?? '{}') }
+    const raw = localStorage.getItem('siteConfig')
+    return raw ? normalizeSiteConfig(JSON.parse(raw)) : null
   } catch {
     return null
   }
+}
+
+function normalizeSiteConfig(config) {
+  const next = { ...DEFAULT_SITE, ...config }
+  return {
+    ...next,
+    trustStats: normalizeList(next.trustStats, DEFAULT_TRUST_STATS),
+    certificates: normalizeList(next.certificates, DEFAULT_CERTIFICATES),
+  }
+}
+
+function normalizeList(items, fallback) {
+  const source = Array.isArray(items) ? items : []
+  return fallback.map((fallbackItem, index) => ({ ...fallbackItem, ...(source[index] ?? {}) }))
 }
 
 function loadSavedProducts() {

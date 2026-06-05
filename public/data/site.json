@@ -1,10 +1,62 @@
 {
-  "brand": "LuLu Funny Tech Toys",
+  "brand": "LuLu Funny Toys",
   "subtitle": "OEM & ODM supported worldwide.",
-  "category": "Games / toys",
+  "category": "+86 18905896997",
   "whatsappNumber": "13072219043",
   "email": "sindeertoys_design@163.com",
   "logoText": "LF",
   "logoImage": "/site/logo.jpg",
-  "coverImage": "/site/cover.jpg"
+  "coverImage": "/site/cover.jpg",
+  "trustStats": [
+    {
+      "value": "4,860+",
+      "unit": "sqm",
+      "label": "Factory Area"
+    },
+    {
+      "value": "3+",
+      "unit": "lines",
+      "label": "Production Lines"
+    },
+    {
+      "value": "5,000+",
+      "unit": "pcs/day",
+      "label": "Custom Daily Capacity"
+    },
+    {
+      "value": "80+",
+      "unit": "people",
+      "label": "Employees"
+    }
+  ],
+  "certificates": [
+    {
+      "label": "ICTI",
+      "image": "/site/certificates/icti.jpg"
+    },
+    {
+      "label": "BSCI",
+      "image": "/site/certificates/bsci.jpg"
+    },
+    {
+      "label": "ISO",
+      "image": "/site/certificates/iso.jpg"
+    },
+    {
+      "label": "CE-RED",
+      "image": "/site/certificates/ce-red.jpg"
+    },
+    {
+      "label": "CCC",
+      "image": "/site/certificates/ccc.jpg"
+    },
+    {
+      "label": "RoHS",
+      "image": "/site/certificates/rohs.jpg"
+    },
+    {
+      "label": "EN71",
+      "image": "/site/certificates/en71.jpg"
+    }
+  ]
 }

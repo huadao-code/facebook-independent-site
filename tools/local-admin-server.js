@@ -21,6 +21,7 @@ const root = process.cwd()
 const dataDir = join(root, 'public', 'data')
 const productsDir = join(root, 'public', 'products')
 const siteDir = join(root, 'public', 'site')
+const certificatesDir = join(siteDir, 'certificates')
 
 createServer(async (request, response) => {
   response.setHeader('Access-Control-Allow-Origin', '*')
@@ -58,6 +59,7 @@ async function saveSite(body) {
   await mkdir(dataDir, { recursive: true })
   await mkdir(productsDir, { recursive: true })
   await mkdir(siteDir, { recursive: true })
+  await mkdir(certificatesDir, { recursive: true })
 
   const normalizedProducts = products.map((product, index) => {
     const next = { ...product }
@@ -77,6 +79,19 @@ async function saveSite(body) {
   if (String(siteConfig.logoImage || '').startsWith('data:image/')) {
     siteWrites.push(writeDataUrl(join(siteDir, 'logo.jpg'), siteConfig.logoImage))
     siteConfig.logoImage = '/site/logo.jpg'
+  }
+
+  if (Array.isArray(siteConfig.certificates)) {
+    const usedNames = new Set()
+    siteConfig.certificates = siteConfig.certificates.map((certificate, index) => {
+      const next = { ...certificate }
+      if (String(next.image || '').startsWith('data:image/')) {
+        const filename = uniqueFilename(`${slug(next.label || `certificate-${index + 1}`)}.jpg`, usedNames)
+        siteWrites.push(writeDataUrl(join(certificatesDir, filename), next.image))
+        next.image = `/site/certificates/${filename}`
+      }
+      return next
+    })
   }
 
   await Promise.all([...imageWrites, ...siteWrites])
@@ -131,6 +146,22 @@ function slug(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'product'
+}
+
+function uniqueFilename(filename, usedNames) {
+  const extensionIndex = filename.lastIndexOf('.')
+  const base = extensionIndex > -1 ? filename.slice(0, extensionIndex) : filename
+  const extension = extensionIndex > -1 ? filename.slice(extensionIndex) : ''
+  let next = filename
+  let count = 2
+
+  while (usedNames.has(next)) {
+    next = `${base}-${count}${extension}`
+    count += 1
+  }
+
+  usedNames.add(next)
+  return next
 }
 
 function sendJson(response, status, body) {
