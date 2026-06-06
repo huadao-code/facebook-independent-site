@@ -18,7 +18,8 @@ const DEFAULT_CERTIFICATES = [
 ]
 
 const DEFAULT_SITE = {
-  brand: 'LuLu Funny Tech Toys',
+  brand: 'LuLu Funny Toys',
+  pageTitle: '',
   subtitle: 'OEM & ODM supported worldwide.',
   category: 'Games / toys',
   whatsappNumber: '13072219043',
@@ -39,6 +40,7 @@ init()
 
 async function init() {
   site = await loadSiteConfig()
+  applyPageMeta(site)
   applyFavicon(site.logoImage || '/favicon.svg')
   products = await loadProducts()
   document.addEventListener('click', handleInquiryTracking)
@@ -262,6 +264,21 @@ function applyFavicon(href) {
     document.head.append(icon)
   }
   icon.href = href
+}
+
+function applyPageMeta(config) {
+  const title = String(config.pageTitle || '').trim() || `${config.brand} | B2B SKU Catalog`
+  const description = `${config.brand} B2B SKU catalog with OEM and ODM inquiry support through WhatsApp.`
+
+  document.title = title
+  setMetaContent('meta[name="description"]', description)
+  setMetaContent('meta[property="og:title"]', title)
+  setMetaContent('meta[property="og:description"]', description)
+}
+
+function setMetaContent(selector, content) {
+  const meta = document.querySelector(selector)
+  if (meta) meta.content = content
 }
 
 function handleInquiryTracking(event) {

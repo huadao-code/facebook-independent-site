@@ -18,7 +18,8 @@ const DEFAULT_CERTIFICATES = [
 ]
 
 const DEFAULT_SITE = {
-  brand: 'LuLu Funny Tech Toys',
+  brand: 'LuLu Funny Toys',
+  pageTitle: '',
   subtitle: 'OEM & ODM supported worldwide.',
   category: 'Games / toys',
   whatsappNumber: '13072219043',
@@ -133,6 +134,7 @@ function render() {
           <h2>Company Profile</h2>
           <div class="form-grid company-grid">
             ${renderInput('brand', 'Company Name', site.brand, 'site')}
+            ${renderInput('pageTitle', 'Browser Title', site.pageTitle, 'site')}
             ${renderInput('subtitle', 'Subtitle', site.subtitle, 'site')}
             ${renderInput('category', 'Main Category', site.category, 'site')}
             ${renderInput('logoText', 'Logo Text', site.logoText, 'site')}
