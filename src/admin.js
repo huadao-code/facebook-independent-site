@@ -63,6 +63,7 @@ let site = DEFAULT_SITE
 let products = []
 let selectedIndex = 0
 let isPublishing = false
+let publishMessage = ''
 
 init()
 
@@ -99,6 +100,7 @@ function render() {
           ${isPublishing ? 'Publishing...' : 'Publish Online'}
         </button>
       </div>
+      ${publishMessage ? `<p class="admin-status">${escapeHtml(publishMessage)}</p>` : ''}
     </header>
 
     <main class="admin-layout">
@@ -507,19 +509,56 @@ async function publishOnline() {
   if (!confirmed) return
 
   isPublishing = true
+  publishMessage = 'Publishing online... 0s'
   render()
 
   try {
-    const result = await postLocalProject('/publish')
+    await postLocalProject('/publish')
+    const result = await waitForPublish()
     localStorage.removeItem('siteConfig')
     localStorage.removeItem('skuProducts')
-    alert(`Published online successfully. Time: ${result.publish.seconds}s. Refresh the online website.`)
+    alert(`Published online successfully. Time: ${result.seconds}s. Refresh the online website.`)
   } catch (error) {
     alert(`Publish failed: ${error.message}\n\nIf the local server is not running, double-click the desktop "启动Facebook本地网站" shortcut first, then try again.`)
   } finally {
     isPublishing = false
+    publishMessage = ''
     render()
   }
+}
+
+async function waitForPublish() {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const status = await getPublishStatus()
+    publishMessage = publishStatusMessage(status)
+    render()
+
+    if (status.status === 'success') return status
+    if (status.status === 'error') throw new Error(status.error || 'Online publish failed.')
+
+    await sleep(5000)
+  }
+
+  throw new Error('Publish status timed out. The desktop script can still be used as a backup.')
+}
+
+async function getPublishStatus() {
+  const response = await fetch('http://127.0.0.1:8787/publish-status')
+  const result = await response.json()
+  if (!response.ok) throw new Error(result.error || 'Cannot read publish status.')
+  return result
+}
+
+function publishStatusMessage(status) {
+  if (status.status === 'success') return `Published online in ${status.seconds}s.`
+  if (status.status === 'error') return 'Publish failed.'
+  return `Publishing online... ${status.seconds || 0}s`
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 
 async function saveToLocalProject() {

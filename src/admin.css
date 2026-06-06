@@ -68,6 +68,15 @@ button:disabled {
   gap: 8px;
 }
 
+.admin-status {
+  flex: 1 1 100%;
+  margin: 8px 0 0;
+  color: #245a95;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
 .admin-actions a,
 .admin-actions button,
 .section-bar button {

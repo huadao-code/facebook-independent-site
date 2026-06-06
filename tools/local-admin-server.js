@@ -25,15 +25,28 @@ const siteDir = join(root, 'public', 'site')
 const certificatesDir = join(siteDir, 'certificates')
 const publishScript = join(root, 'tools', 'publish-online.ps1')
 let publishInProgress = false
+let publishJob = {
+  status: 'idle',
+  log: '',
+  startedAt: null,
+  finishedAt: null,
+  seconds: 0,
+  error: '',
+}
 
 createServer(async (request, response) => {
   response.setHeader('Access-Control-Allow-Origin', '*')
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (request.method === 'OPTIONS') {
     response.writeHead(204)
     response.end()
+    return
+  }
+
+  if (request.method === 'GET' && request.url === '/publish-status') {
+    sendJson(response, 200, publishJobView())
     return
   }
 
@@ -56,12 +69,8 @@ createServer(async (request, response) => {
     }
 
     publishInProgress = true
-    try {
-      const publish = await publishOnline()
-      sendJson(response, 200, { ok: true, save: result, publish })
-    } finally {
-      publishInProgress = false
-    }
+    startPublishJob()
+    sendJson(response, 202, { ok: true, save: result, publish: publishJobView() })
   } catch (error) {
     sendJson(response, 500, { error: error.message })
   }
@@ -149,48 +158,65 @@ async function writeDataUrl(path, dataUrl) {
   await writeFile(path, Buffer.from(match[2], 'base64'))
 }
 
-function publishOnline() {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', publishScript, '-OnlineUrl', 'https://www.lulufunnytoys.com'],
-      { cwd: root, windowsHide: true },
-    )
-    const output = []
-    const startedAt = Date.now()
-    const timeout = setTimeout(() => {
-      child.kill()
-      reject(new Error('Publish timed out after 10 minutes.'))
-    }, 10 * 60 * 1000)
+function startPublishJob() {
+  publishJob = {
+    status: 'running',
+    log: '',
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    seconds: 0,
+    error: '',
+  }
 
-    child.stdout.on('data', (chunk) => {
-      output.push(chunk.toString())
-    })
+  const startedAt = Date.now()
+  const child = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', publishScript, '-OnlineUrl', 'https://www.lulufunnytoys.com'],
+    { cwd: root, windowsHide: true },
+  )
+  const timeout = setTimeout(() => {
+    appendPublishLog('Publish timed out after 10 minutes.')
+    child.kill()
+  }, 10 * 60 * 1000)
 
-    child.stderr.on('data', (chunk) => {
-      output.push(chunk.toString())
-    })
-
-    child.on('error', (error) => {
-      clearTimeout(timeout)
-      reject(error)
-    })
-
-    child.on('close', (code) => {
-      clearTimeout(timeout)
-      const log = output.join('').slice(-12000)
-      if (code !== 0) {
-        reject(new Error(`Publish failed with code ${code}.\n${log}`))
-        return
-      }
-
-      resolve({
-        code,
-        seconds: Math.round((Date.now() - startedAt) / 1000),
-        log,
-      })
-    })
+  child.stdout.on('data', (chunk) => {
+    appendPublishLog(chunk.toString())
   })
+
+  child.stderr.on('data', (chunk) => {
+    appendPublishLog(chunk.toString())
+  })
+
+  child.on('error', (error) => {
+    clearTimeout(timeout)
+    publishInProgress = false
+    publishJob.status = 'error'
+    publishJob.error = error.message
+    publishJob.finishedAt = new Date().toISOString()
+    publishJob.seconds = Math.round((Date.now() - startedAt) / 1000)
+    appendPublishLog(error.message)
+  })
+
+  child.on('close', (code) => {
+    clearTimeout(timeout)
+    publishInProgress = false
+    publishJob.status = code === 0 ? 'success' : 'error'
+    publishJob.error = code === 0 ? '' : `Publish failed with code ${code}.`
+    publishJob.finishedAt = new Date().toISOString()
+    publishJob.seconds = Math.round((Date.now() - startedAt) / 1000)
+  })
+}
+
+function appendPublishLog(text) {
+  publishJob.log = `${publishJob.log}${text}`.slice(-12000)
+}
+
+function publishJobView() {
+  const seconds =
+    publishJob.status === 'running' && publishJob.startedAt
+      ? Math.round((Date.now() - Date.parse(publishJob.startedAt)) / 1000)
+      : publishJob.seconds
+  return { ...publishJob, seconds, inProgress: publishInProgress }
 }
 
 function toCsv(items) {
