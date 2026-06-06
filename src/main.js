@@ -152,10 +152,13 @@ function renderCatalog() {
   `
 }
 
-function renderProductCard(product) {
+function renderProductCard(product, index) {
+  const loading = index < 2 ? 'eager' : 'lazy'
+  const fetchPriority = index === 0 ? ' fetchpriority="high"' : ''
+
   return `
     <article class="sku-card">
-      <img src="${product.image}" alt="${product.name}" loading="lazy" />
+      <img src="${product.image}" alt="${product.name}" loading="${loading}"${fetchPriority} />
       <div class="sku-body">
         <div class="sku-heading">
           <span>${product.category}</span>
