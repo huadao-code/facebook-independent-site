@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
@@ -22,6 +23,8 @@ const dataDir = join(root, 'public', 'data')
 const productsDir = join(root, 'public', 'products')
 const siteDir = join(root, 'public', 'site')
 const certificatesDir = join(siteDir, 'certificates')
+const publishScript = join(root, 'tools', 'publish-online.ps1')
+let publishInProgress = false
 
 createServer(async (request, response) => {
   response.setHeader('Access-Control-Allow-Origin', '*')
@@ -34,15 +37,31 @@ createServer(async (request, response) => {
     return
   }
 
-  if (request.method !== 'POST' || request.url !== '/save') {
+  if (request.method !== 'POST' || !['/save', '/publish'].includes(request.url)) {
     sendJson(response, 404, { error: 'Not found' })
+    return
+  }
+
+  if (request.url === '/publish' && publishInProgress) {
+    sendJson(response, 409, { error: 'Publish is already running.' })
     return
   }
 
   try {
     const body = await readJson(request)
     const result = await saveSite(body)
-    sendJson(response, 200, result)
+    if (request.url === '/save') {
+      sendJson(response, 200, result)
+      return
+    }
+
+    publishInProgress = true
+    try {
+      const publish = await publishOnline()
+      sendJson(response, 200, { ok: true, save: result, publish })
+    } finally {
+      publishInProgress = false
+    }
   } catch (error) {
     sendJson(response, 500, { error: error.message })
   }
@@ -128,6 +147,50 @@ async function writeDataUrl(path, dataUrl) {
   const match = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/)
   if (!match) throw new Error(`Invalid image data for ${path}`)
   await writeFile(path, Buffer.from(match[2], 'base64'))
+}
+
+function publishOnline() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', publishScript, '-OnlineUrl', 'https://www.lulufunnytoys.com'],
+      { cwd: root, windowsHide: true },
+    )
+    const output = []
+    const startedAt = Date.now()
+    const timeout = setTimeout(() => {
+      child.kill()
+      reject(new Error('Publish timed out after 10 minutes.'))
+    }, 10 * 60 * 1000)
+
+    child.stdout.on('data', (chunk) => {
+      output.push(chunk.toString())
+    })
+
+    child.stderr.on('data', (chunk) => {
+      output.push(chunk.toString())
+    })
+
+    child.on('error', (error) => {
+      clearTimeout(timeout)
+      reject(error)
+    })
+
+    child.on('close', (code) => {
+      clearTimeout(timeout)
+      const log = output.join('').slice(-12000)
+      if (code !== 0) {
+        reject(new Error(`Publish failed with code ${code}.\n${log}`))
+        return
+      }
+
+      resolve({
+        code,
+        seconds: Math.round((Date.now() - startedAt) / 1000),
+        log,
+      })
+    })
+  })
 }
 
 function toCsv(items) {

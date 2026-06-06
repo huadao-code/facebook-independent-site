@@ -62,6 +62,7 @@ const admin = document.querySelector('#admin')
 let site = DEFAULT_SITE
 let products = []
 let selectedIndex = 0
+let isPublishing = false
 
 init()
 
@@ -92,8 +93,11 @@ function render() {
       </div>
       <div class="admin-actions">
         <a href="/" target="_blank" rel="noreferrer">Open Frontend</a>
-        <button type="button" data-action="save">Save Preview</button>
-        <button type="button" data-action="export">Export CSV</button>
+        <button type="button" data-action="save" ${isPublishing ? 'disabled' : ''}>Save Preview</button>
+        <button type="button" data-action="export" ${isPublishing ? 'disabled' : ''}>Export CSV</button>
+        <button type="button" data-action="publish" ${isPublishing ? 'disabled' : ''}>
+          ${isPublishing ? 'Publishing...' : 'Publish Online'}
+        </button>
       </div>
     </header>
 
@@ -350,6 +354,8 @@ function handleAction(action) {
     savePreview()
   } else if (action === 'export') {
     exportCsv()
+  } else if (action === 'publish') {
+    publishOnline()
   } else if (action === 'add') {
     products.push(createProduct())
     selectedIndex = products.length - 1
@@ -494,15 +500,31 @@ async function exportCsv() {
   }
 }
 
+async function publishOnline() {
+  if (isPublishing) return
+
+  const confirmed = confirm('Publish current admin edits to the online website now? This can take 30-90 seconds.')
+  if (!confirmed) return
+
+  isPublishing = true
+  render()
+
+  try {
+    const result = await postLocalProject('/publish')
+    localStorage.removeItem('siteConfig')
+    localStorage.removeItem('skuProducts')
+    alert(`Published online successfully. Time: ${result.publish.seconds}s. Refresh the online website.`)
+  } catch (error) {
+    alert(`Publish failed: ${error.message}\n\nIf the local server is not running, double-click the desktop "启动Facebook本地网站" shortcut first, then try again.`)
+  } finally {
+    isPublishing = false
+    render()
+  }
+}
+
 async function saveToLocalProject() {
   try {
-    const response = await fetch('http://127.0.0.1:8787/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ site, products }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error || 'Local save failed.')
+    const result = await postLocalProject('/save')
 
     localStorage.removeItem('siteConfig')
     localStorage.removeItem('skuProducts')
@@ -512,6 +534,17 @@ async function saveToLocalProject() {
     alert(`Local save server is not running. I will try browser download instead. Error: ${error.message}`)
     return false
   }
+}
+
+async function postLocalProject(path) {
+  const response = await fetch(`http://127.0.0.1:8787${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ site, products }),
+  })
+  const result = await response.json()
+  if (!response.ok) throw new Error(result.error || 'Local save failed.')
+  return result
 }
 
 function prepareProductsForExport(items) {
